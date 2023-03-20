@@ -1,0 +1,148 @@
+# Set working directory
+setwd("/Users/lena/Documents/Studium/Magdeburg/Doktorarbeit/DELCODE/DELCODE/data tables")
+dir()
+
+## -------------------------------
+# Load libraries
+library(lavaan)
+
+## -------------------------------
+# Load data
+data <- read_excel("baseline_FS.xlsx")
+
+## -------------------------------
+# SEM analysis for 1-factor model
+
+one_factor_model <- '
+# Measurement model
+NAgeneral =~ HIPPOCAMPUS + THALAMUS + AMYGDALA + BA7 + BA24 + BA46 + PUTAMEN + PALLIDUM + CAUDATE + BA4 + BA47 + OCCIPITALCORTEX
+'
+
+fit.one_factor_model <- cfa(model = one_factor_model,
+                            data = subset_mySEM,
+                            meanstructure = TRUE)
+
+summary(fit.one_factor_model,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+
+# SEM analysis for 2-factor model
+
+two_factor_model <- '
+# Measurement model
+NAhigh =~ HIPPOCAMPUS + THALAMUS + AMYGDALA + BA7 + BA24 + BA46
+NAlow =~ PUTAMEN + PALLIDUM + CAUDATE + BA4 + BA47 + OCCIPITALCORTEX
+'
+
+fit.two_factor_model <- cfa(model = two_factor_model,
+                            data = subset_mySEM,
+                            meanstructure = TRUE)
+
+summary(fit.two_factor_model,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+# Comparison of 1- to 2-factor model
+
+anova(fit.two_factor_model, fit.one_factor_model)
+
+## -------------------------------
+
+# SEM with 2-factor model and added variables of interest + control variables
+
+CSF_memory_model <- '
+# Measurement model
+NAhigh =~ HIPPOCAMPUS + THALAMUS + AMYGDALA + BA7 + BA24 + BA46
+NAlow =~ PUTAMEN + PALLIDUM + CAUDATE + BA4 + BA47 + OCCIPITALCORTEX
+
+# Structural model
+NAhigh ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+NAlow ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM ~ NAhigh + NAlow + ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+NAhigh ~~ NAlow
+'
+fit.CSF_memory_model <- cfa(model = CSF_memory_model,
+                     data = baseline_FS,
+                     meanstructure = TRUE)
+
+summary(fit.CSF_memory_model,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE,
+        ci=TRUE)
+
+## -------------------------------
+
+# CSF-memory-model for multiple group comparison
+
+CSF_memory_model_MGC <- '
+# Measurement model
+NAhigh =~ HIPPOCAMPUS + THALAMUS + AMYGDALA + BA7 + BA24 + BA46
+NAlow =~ PUTAMEN + PALLIDUM + CAUDATE + BA4 + BA47 + OCCIPITALCORTEX
+
+# Structural model
+NAhigh ~ c(a,a,a)*ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+NAlow ~ c(b,b,b)*ptau + c(c,c,c)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM ~ c(d,d,d)*NAhigh + c(e,e,e)*NAlow + c(f,f,f)*ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+NAhigh ~~ NAlow
+'
+
+# multiple group comparison
+
+config_CSF_memory_model <- cfa(CSF_memory_model, data = baseline_FS, group = "group", meanstructure = TRUE)
+partial_weak_CSF_memory_model <- cfa(CSF_memory_model, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                              group.partial=c("NAhigh=~BA7", "NAlow=~OCCIPITALCORTEX", "NAlow=~BA4", "NAhigh=~BA46", "NAhigh=~THALAMUS"),
+                              meanstructure = TRUE)
+regression_CSF_memory_model <- cfa(CSF_memory_model_MGC, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                            group.partial=c("NAhigh=~BA7", "NAlow=~OCCIPITALCORTEX", "NAlow=~BA4", "NAhigh=~BA46", "NAhigh=~THALAMUS"),
+                            meanstructure = TRUE, check.gradient = FALSE)
+
+
+lavTestLRT(config_CSF_memory_model, partial_weak_CSF_memory_model, regression_CSF_memory_model)
+
+summary(regression_CSF_memory_model, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+
+
+## -------------------------------
+
+# LC-SN-model
+
+LC_SN_model <- '
+# Measurement model
+NAhigh =~ HIPPOCAMPUS + THALAMUS + AMYGDALA + BA7 + BA24 + BA46
+NAlow =~ PUTAMEN + PALLIDUM + CAUDATE + BA4 + BA47 + OCCIPITALCORTEX
+
+# Structural model
+NAhigh + NAlow ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender + LC_medCR + SN_medCR
+ptau + ratioAß4240 + LC_medCR + SN_medCR ~ ApoE4status + age + education + WMH + gender
+
+MEM ~ NAhigh + NAlow + ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender + LC_medCR + SN_medCR
+
+ptau ~~ ratioAß4240
+LC_medCR + SN_medCR ~~ ptau + ratioAß4240
+LC_medCR ~~ SN_medCR
+NAhigh ~~ NAlow
+'
+
+fit.LC_SN_model <- cfa(model = LC_SN_model,
+                       data = baseline_FS,
+                       meanstructure = TRUE)
+
+summary(fit.LC_SN_model,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
