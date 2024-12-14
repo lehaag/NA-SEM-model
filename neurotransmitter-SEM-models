@@ -1,0 +1,493 @@
+# Set working directory
+setwd("/Users/lena/Documents/Studium/Magdeburg/Doktorarbeit/DELCODE/DELCODE/data tables")
+dir()
+
+## -------------------------------
+# Load libraries
+library(lavaan)
+
+## -------------------------------
+# Load data
+data <- read_excel("baseline_FS.xlsx")
+
+## -------------------------------
+# SEM analysis for 1-factor model - NORADRENALINE
+
+one_factor_model <- '
+# Measurement model
+NAgeneral =~ HIPPOCAMPUS + BRAINSTEM + HYPOTHALAMUS + THALAMUS + AMYGDALA + PUTAMEN + CEREBELLUM + ACCUMBENS + CAUDATE + PALLIDUM'
+
+fit.one_factor_model <- cfa(model = one_factor_model,
+                            data = baseline_FS,
+                            meanstructure = TRUE)
+
+summary(fit.one_factor_model,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+
+# SEM analysis for 2-factor model - NORADRENALINE
+
+two_factor_model <- '
+# Measurement model
+NAhigh =~ HIPPOCAMPUS + BRAINSTEM + HYPOTHALAMUS + THALAMUS + AMYGDALA
+NAlow =~ PUTAMEN + CEREBELLUM + ACCUMBENS + CAUDATE + PALLIDUM
+'
+
+fit.two_factor_model <- cfa(model = two_factor_model,
+                                     data = baseline_FS,
+                                     meanstructure = TRUE)
+
+summary(fit.two_factor_model,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+# Comparison of 1- to 2-factor model
+
+anova(fit.two_factor_model, fit.one_factor_model)
+
+## -------------------------------
+
+# SEM with 2-factor model and added variables of interest + control variables - NORADRENALINE
+
+CSF_model <- '
+# Measurement model
+NAhigh =~ THALAMUS + BRAINSTEM + HYPOTHALAMUS + HIPPOCAMPUS + AMYGDALA
+NAlow =~ PUTAMEN + CEREBELLUM + ACCUMBENS + CAUDATE + PALLIDUM
+
+HIPPOCAMPUS ~~ AMYGDALA
+BRAINSTEM ~~ CEREBELLUM
+BRAINSTEM ~~ PALLIDUM
+
+# Structural model
+NAhigh ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+NAlow ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM + LAN + EXEC + WOMEM + VIS ~ NAhigh + NAlow + ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+NAhigh ~~ NAlow
+'
+
+fit.CSF_model <- cfa(model = CSF_model,
+                     data = baseline_FS,
+                     meanstructure = TRUE)
+
+summary(fit.CSF_model,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+## -------------------------------
+
+# CSF-memory-model for multiple group comparison - NORADRENALINE
+
+CSF_model_MGC <- '
+# Measurement model
+NAhigh =~ THALAMUS + BRAINSTEM + HYPOTHALAMUS + HIPPOCAMPUS + AMYGDALA
+NAlow =~ PUTAMEN + CEREBELLUM + ACCUMBENS + CAUDATE + PALLIDUM
+
+HIPPOCAMPUS ~~ AMYGDALA
+BRAINSTEM ~~ CEREBELLUM
+BRAINSTEM ~~ PALLIDUM
+
+# Structural model
+NAhigh ~ c(a,a,a)*ptau + c(b,b,b)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+NAlow ~ c(c,c,c)*ptau + c(d,d,d)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM ~ c(e,e,e)*NAhigh + c(f,f,f)*NAlow + c(g,g,g)*ptau + c(h,h,h)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+LAN ~ c(i,i,i)*NAhigh + c(j,j,j)*NAlow + c(k,k,k)*ptau + c(l,l,l)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+EXEC ~ c(m,m,m)*NAhigh + c(n,n,n)*NAlow + c(o,o,o)*ptau + c(p,p,p)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+WOMEM ~ c(q,q,q)*NAhigh + c(r,r,r)*NAlow + c(s,s,s)*ptau + c(t,t,t)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+VIS ~ c(u,u,u)*NAhigh + c(v,v,v)*NAlow + c(w,w,w)*ptau + c(x,x,x)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+NAhigh ~~ c(z,z,z)*NAlow
+'
+
+## MULTIPLE GROUP COMPARISONS
+
+# multiple group comparison CSF_model
+config_CSF_model <- cfa(CSF_model, data = baseline_FS, group = "group", meanstructure = TRUE)
+weak_CSF_model <- cfa(CSF_model, data = baseline_FS, group = "group", group.equal=c("loadings"), meanstructure = TRUE)
+partial_weak_CSF_model <- cfa(CSF_model, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                              group.partial=c("NAhigh=~HYPOTHALAMUS", "NAhigh=~AMYGDALA", "NAlow=~TEMPORALCORTEX", "NAlow=~ACCUMBENS"),
+                              meanstructure = TRUE)
+strong_CSF_model <- cfa(CSF_model, data = baseline_FS, group = "group", group.equal=c("loadings", "intercepts"),
+                        group.partial=c("NAhigh=~HYPOTHALAMUS", "NAlow=~TEMPORALCORTEX", "NAlow=~ACCUMBENS"),
+                        meanstructure = TRUE)
+
+regression_CSF_model <- cfa(CSF_model_MGC, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                            meanstructure = TRUE,
+                            check.gradient = FALSE)
+
+
+lavTestLRT(config_CSF_model, weak_CSF_model, regression_CSF_model)
+
+summary(regression_CSF_model, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+
+## -------------------------------
+
+# SEM analysis for 1-factor model - DOPAMINE
+
+one_factor_model_DA <- '
+# Measurement model
+DAgeneral =~ THALAMUS + CAUDATE + PUTAMEN + BRAINSTEM + ACCUMBENS + CINGULATECORTEX + CEREBELLUM + PALLIDUM + OCCIPITALCORTEX + FRONTALCORTEX'
+
+fit.one_factor_model_DA <- cfa(model = one_factor_model_DA,
+                               data = baseline_FS,
+                               meanstructure = TRUE)
+
+summary(fit.one_factor_model_DA,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+
+# SEM analysis for 2-factor model - DOPAMINE
+
+two_factor_model_DA <- '
+# Measurement model
+DAhigh =~ THALAMUS + CAUDATE + PUTAMEN + BRAINSTEM + ACCUMBENS
+DAlow =~ CINGULATECORTEX + CEREBELLUM + PALLIDUM + OCCIPITALCORTEX + FRONTALCORTEX
+'
+
+fit.two_factor_model_DA <- cfa(model = two_factor_model_DA,
+                            data = baseline_FS,
+                            meanstructure = TRUE)
+
+summary(fit.two_factor_model_DA,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+# Comparison of 1- to 2-factor model - DOPAMINE
+
+anova(fit.two_factor_model_DA, fit.one_factor_model_DA)
+
+## -------------------------------
+
+# SEM with 2-factor model and added variables of interest + control variables - DOPAMINE
+
+CSF_model_DA <- '
+# Measurement model
+DAhigh =~ THALAMUS + CAUDATE + PUTAMEN + BRAINSTEM + ACCUMBENS
+DAlow =~ CINGULATECORTEX + CEREBELLUM + PALLIDUM + OCCIPITALCORTEX + FRONTALCORTEX
+
+BRAINSTEM ~~ CEREBELLUM
+PUTAMEN ~~ PALLIDUM
+BRAINSTEM ~~PALLIDUM
+
+# Structural model
+DAhigh ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+DAlow ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM + LAN + EXEC + WOMEM + VIS ~ DAhigh + DAlow + ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+DAhigh ~~ DAlow
+'
+
+fit.CSF_model_DA <- cfa(model = CSF_model_DA,
+                     data = baseline_FS,
+                     meanstructure = TRUE)
+
+summary(fit.CSF_model_DA,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+## -------------------------------
+
+# CSF-memory-model for multiple group comparison - DOPAMINE
+
+CSF_model_MGC_DA <- '
+# Measurement model
+DAhigh =~ THALAMUS + CAUDATE + PUTAMEN + BRAINSTEM + ACCUMBENS
+DAlow =~ CINGULATECORTEX + CEREBELLUM + PALLIDUM + OCCIPITALCORTEX + FRONTALCORTEX
+
+BRAINSTEM ~~ CEREBELLUM
+PUTAMEN ~~ PALLIDUM
+BRAINSTEM ~~PALLIDUM
+
+# Structural model
+DAhigh ~ c(a,a,a)*ptau + c(b,b,b)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+DAlow ~ c(c,c,c)*ptau + c(d,d,d)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM ~ c(e,e,e)*DAhigh + c(f,f,f)*DAlow + c(g,g,g)*ptau + c(h,h,h)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+LAN ~ c(i,i,i)*DAhigh + c(j,j,j)*DAlow + c(k,k,k)*ptau + c(l,l,l)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+EXEC ~ c(m,m,m)*DAhigh + c(n,n,n)*DAlow + c(o,o,o)*ptau + c(p,p,p)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+WOMEM ~ c(q,q,q)*DAhigh + c(r,r,r)*DAlow + c(s,s,s)*ptau + c(t,t,t)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+VIS ~ c(u,u,u)*DAhigh + c(v,v,v)*DAlow + c(w,w,w)*ptau + c(x,x,x)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+DAhigh ~~ c(z,z,z)*DAlow
+'
+
+## MULTIPLE GROUP COMPARISONS - DOPAMINE
+
+# multiple group comparison CSF_model
+config_CSF_model_DA <- cfa(CSF_model_DA, data = baseline_FS, group = "group", meanstructure = TRUE)
+weak_CSF_model_DA <- cfa(CSF_model_DA, data = baseline_FS, group = "group", group.equal=c("loadings"), meanstructure = TRUE)
+partial_weak_CSF_model_DA <- cfa(CSF_model_DA, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                              group.partial=c("DAhigh=~HYPOTHALAMUS", "DAhigh=~AMYGDALA"),
+                              meanstructure = TRUE)
+regression_CSF_model_DA <- cfa(CSF_model_MGC_DA, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                            meanstructure = TRUE,
+                            check.gradient = FALSE)
+
+
+lavTestLRT(config_CSF_model_DA, weak_CSF_model_DA, regression_CSF_model_DA)
+
+summary(regression_CSF_model_DA, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE, ci= TRUE)
+
+## -------------------------------
+
+# SEM analysis for 1-factor model - SEROTONIN
+
+one_factor_model_HT <- '
+# Measurement model
+HTgeneral =~ FRONTALCORTEX + PARIETALCORTEX + INSULA + TEMPORALCORTEX + HYPOTHALAMUS + THALAMUS + PALLIDUM + CEREBELLUM + PUTAMEN + ACCUMBENS'
+
+fit.one_factor_model_HT <- cfa(model = one_factor_model_HT,
+                            data = baseline_FS,
+                            meanstructure = TRUE)
+
+summary(fit.one_factor_model_HT,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+
+# SEM analysis for 2-factor model - SEROTONIN
+
+two_factor_model_HT <- '
+# Measurement model
+HThigh =~ FRONTALCORTEX + PARIETALCORTEX + INSULA + TEMPORALCORTEX + HYPOTHALAMUS
+HTlow =~ THALAMUS + PALLIDUM + CEREBELLUM + PUTAMEN + ACCUMBENS'
+
+fit.two_factor_model_HT <- cfa(model = two_factor_model_HT,
+                               data = baseline_FS,
+                               meanstructure = TRUE)
+
+summary(fit.two_factor_model_HT,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+# Comparison of 1- to 2-factor model - SEROTONIN
+
+anova(fit.two_factor_model_HT, fit.one_factor_model_HT)
+
+## -------------------------------
+
+# SEM with 2-factor model and added variables of interest + control variables - SEROTONIN
+
+CSF_model_HT <- '
+# Measurement model
+HThigh =~ FRONTALCORTEX + PARIETALCORTEX + INSULA + TEMPORALCORTEX + HYPOTHALAMUS
+HTlow =~ THALAMUS + PALLIDUM + CEREBELLUM + PUTAMEN + ACCUMBENS
+
+PALLIDUM ~~ PUTAMEN
+HYPOTHALAMUS ~~ THALAMUS
+HYPOTHALAMUS ~~ ACCUMBENS
+
+# Structural model
+HThigh ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+HTlow ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM + LAN + EXEC + WOMEM + VIS ~ HThigh + HTlow + ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+HThigh ~~ HTlow
+'
+
+fit.CSF_model_HT <- cfa(model = CSF_model_HT,
+                        data = baseline_FS,
+                        meanstructure = TRUE)
+
+summary(fit.CSF_model_HT,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+## -------------------------------
+
+# CSF-memory-model for multiple group comparison - SEROTONIN
+
+CSF_model_MGC_HT <- '
+# Measurement model
+HThigh =~ FRONTALCORTEX + PARIETALCORTEX + INSULA + TEMPORALCORTEX + HYPOTHALAMUS
+HTlow =~ THALAMUS + PALLIDUM + CEREBELLUM + PUTAMEN + ACCUMBENS
+
+PALLIDUM ~~ PUTAMEN
+HYPOTHALAMUS ~~ THALAMUS
+HYPOTHALAMUS ~~ ACCUMBENS
+
+# Structural model
+HThigh ~ c(a,a,a)*ptau + c(b,b,b)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+HTlow ~ c(c,c,c)*ptau + c(d,d,d)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM ~ c(e,e,e)*HThigh + c(f,f,f)*HTlow + c(g,g,g)*ptau + c(h,h,h)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+LAN ~ c(i,i,i)*HThigh + c(j,j,j)*HTlow + c(k,k,k)*ptau + c(l,l,l)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+EXEC ~ c(m,m,m)*HThigh + c(n,n,n)*HTlow + c(o,o,o)*ptau + c(p,p,p)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+WOMEM ~ c(q,q,q)*HThigh + c(r,r,r)*HTlow + c(s,s,s)*ptau + c(t,t,t)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+VIS ~ c(u,u,u)*HThigh + c(v,v,v)*HTlow + c(w,w,w)*ptau + c(x,x,x)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+HThigh ~~ HTlow
+'
+
+## MULTIPLE GROUP COMPARISONS - SEROTONIN
+
+# multiple group comparison CSF_model
+config_CSF_model_HT <- cfa(CSF_model_HT, data = baseline_FS, group = "group", meanstructure = TRUE, check.gradient = FALSE)
+weak_CSF_model_HT <- cfa(CSF_model_HT, data = baseline_FS, group = "group", group.equal=c("loadings"), meanstructure = TRUE)
+partial_weak_CSF_model_HT <- cfa(CSF_model_HT, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                                 group.partial=c("HThigh=~HYPOTHALAMUS"),
+                                 meanstructure = TRUE)
+regression_CSF_model_HT <- cfa(CSF_model_MGC_HT, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                               group.partial=c("HThigh=~HYPOTHALAMUS"),
+                               meanstructure = TRUE)
+
+
+lavTestLRT(config_CSF_model_HT, partial_weak_CSF_model_HT, regression_CSF_model_HT)
+
+summary(regression_CSF_model_HT, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE, ci= TRUE)
+
+## -------------------------------
+
+# SEM analysis for 1-factor model - ACETYLCHOLINE
+
+one_factor_model_ACh <- '
+# Measurement model
+AChgeneral =~ THALAMUS + BRAINSTEM + HYPOTHALAMUS + AMYGDALA + HIPPOCAMPUS + PALLIDUM + ACCUMBENS + CAUDATE + PUTAMEN + TEMPORALCORTEX'
+
+fit.one_factor_model_ACh <- cfa(model = one_factor_model_ACh,
+                               data = baseline_FS,
+                               meanstructure = TRUE)
+
+summary(fit.one_factor_model_ACh,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+
+# SEM analysis for 2-factor model - ACETYLCHOLINE
+
+two_factor_model_ACh <- '
+# Measurement model
+AChhigh =~ THALAMUS + BRAINSTEM + HYPOTHALAMUS + AMYGDALA + HIPPOCAMPUS
+AChlow =~ PALLIDUM + ACCUMBENS + CAUDATE + PUTAMEN + TEMPORALCORTEX'
+
+fit.two_factor_model_ACh <- cfa(model = two_factor_model_ACh,
+                               data = baseline_FS,
+                               meanstructure = TRUE)
+
+summary(fit.two_factor_model_ACh,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+# Comparison of 1- to 2-factor model - ACETYLCHOLINE
+
+anova(fit.two_factor_model_ACh, fit.one_factor_model_ACh)
+
+## -------------------------------
+
+# SEM with 2-factor model and added variables of interest + control variables - ACETYLCHOLINE
+
+CSF_model_ACh <- '
+# Measurement model
+AChhigh =~ THALAMUS + BRAINSTEM + HYPOTHALAMUS + AMYGDALA + HIPPOCAMPUS
+AChlow =~ PALLIDUM + ACCUMBENS + CAUDATE + PUTAMEN + TEMPORALCORTEX
+
+PALLIDUM ~~ PUTAMEN
+BRAINSTEM ~~ HYPOTHALAMUS
+BRAINSTEM ~~ PALLIDUM
+
+# Structural model
+AChhigh ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+AChlow ~ ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM + LAN + EXEC + WOMEM + VIS ~ AChhigh + AChlow + ptau + ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ ratioAß4240
+AChhigh ~~ AChlow
+'
+
+fit.CSF_model_ACh <- cfa(model = CSF_model_ACh,
+                        data = baseline_FS,
+                        meanstructure = TRUE,
+                        check.gradient = FALSE)
+
+summary(fit.CSF_model_ACh,
+        rsquare = TRUE,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+## -------------------------------
+
+# CSF-memory-model for multiple group comparison - ACETYLCHOLINE
+
+CSF_model_MGC_ACh <- '
+# Measurement model
+AChhigh =~ THALAMUS + BRAINSTEM + HYPOTHALAMUS + AMYGDALA + HIPPOCAMPUS
+AChlow =~ PALLIDUM + ACCUMBENS + CAUDATE + PUTAMEN + TEMPORALCORTEX
+
+PALLIDUM ~~ PUTAMEN
+BRAINSTEM ~~ HYPOTHALAMUS
+BRAINSTEM ~~ PALLIDUM
+
+# Structural model
+AChhigh ~ c(a,a,a)*ptau + c(b,b,b)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+AChlow ~ c(c,c,c)*ptau + c(d,d,d)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+ptau ~ ApoE4status + age + education + WMH + gender
+ratioAß4240 ~ ApoE4status + age + education + WMH + gender
+
+MEM ~ c(e,e,e)*AChhigh + c(f,f,f)*AChlow + c(g,g,g)*ptau + c(h,h,h)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+LAN ~ c(i,i,i)*AChhigh + c(j,j,j)*AChlow + c(k,k,k)*ptau + c(l,l,l)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+EXEC ~ c(m,m,m)*AChhigh + c(n,n,n)*AChlow + c(o,o,o)*ptau + c(p,p,p)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+WOMEM ~ c(q,q,q)*AChhigh + c(r,r,r)*AChlow + c(s,s,s)*ptau + c(t,t,t)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+VIS ~ c(u,u,u)*AChhigh + c(v,v,v)*AChlow + c(w,w,w)*ptau + c(x,x,x)*ratioAß4240 + ApoE4status + age + education + WMH + gender
+
+ptau ~~ c(y,y,y)*ratioAß4240
+AChhigh ~~ c(z,z,z)*AChlow
+'
+
+## MULTIPLE GROUP COMPARISONS - ACETYLCHOLINE
+
+# multiple group comparison CSF_model
+config_CSF_model_HT <- cfa(CSF_model_HT, data = baseline_FS, group = "group", meanstructure = TRUE, check.gradient = FALSE)
+weak_CSF_model_HT <- cfa(CSF_model_HT, data = baseline_FS, group = "group", group.equal=c("loadings"), meanstructure = TRUE)
+partial_weak_CSF_model_HT <- cfa(CSF_model_HT, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                                 group.partial=c("HThigh=~HYPOTHALAMUS"),
+                                 meanstructure = TRUE)
+regression_CSF_model_HT <- cfa(CSF_model_MGC_HT, data = baseline_FS, group = "group", group.equal=c("loadings"),
+                               group.partial=c("HThigh=~HYPOTHALAMUS"),
+                               meanstructure = TRUE)
+
+
+lavTestLRT(config_CSF_model_HT, partial_weak_CSF_model_HT, regression_CSF_model_HT)
+
+summary(regression_CSF_model_HT, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE, ci= TRUE)
+
+config_CSF_model_ACh <- cfa(CSF_model_ACh, data = baseline_FS, group = "group", meanstructure = TRUE, check.gradient = FALSE)
+weak_CSF_model_ACh <- cfa(CSF_model_ACh, data = baseline_FS, group = "group", group.equal=c("loadings"), meanstructure = TRUE, check.gradient = FALSE)
+
